@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
-import AuthLayout from "../components/AuthLayout";
 
 export default function Login() {
   const [form, setForm] = useState({ email: "", password: "" });
@@ -14,7 +13,10 @@ export default function Login() {
   const set = (key) => (event) =>
     setForm((form) => ({ ...form, [key]: event.target.value }));
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.email || !form.password)
+      return setError("Please fill all fields");
     setError("");
     setLoading(true);
     try {
@@ -23,79 +25,120 @@ export default function Login() {
       login(data.token, data.user);
       navigate("/dashboard");
     } catch (err) {
-      setError(err.response?.data?.message || "Login failed");
+      console.error("Login error:", err);
+
+      if (err.response) {
+        switch (err.response.status) {
+          case 400:
+            setError("Please enter valid credentials");
+            break;
+
+          case 401:
+            setError("Invalid email or password");
+            break;
+
+          case 403:
+            setError("Please verify your email before logging in");
+            break;
+
+          case 404:
+            setError("User not found");
+            break;
+
+          case 500:
+            setError("Server error. Please try again later");
+            break;
+
+          default:
+            setError(err.response.data?.message || "Something went wrong");
+        }
+      } else if (err.request) {
+        setError("Unable to connect to server");
+      } else {
+        setError("An unexpected error occurred");
+      }
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <AuthLayout subtitle="Welcome back. Your library awaits.">
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center px-4 gap-4">
       {error && (
-        <p className="text-red-400 text-sm mb-4 bg-red-400/10 px-3 py-2 rounded-lg">
+        <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl">
           {error}
-        </p>
+        </div>
       )}
+      <div className="w-full max-w-sm bg-white rounded-3xl shadow-xl border border-slate-100 p-8">
+        <div className="mb-8">
+          <h1 className="font-heading mb-5 text-5xl text-slate-900 font-bold">
+            SaveIt
+          </h1>
+          <p className="text-sm text-slate-500 mt-2">
+            Welcome back. Sign in to continue.
+          </p>
+        </div>
 
-      <label className="block text-xs text-slate-400 mb-1.5 uppercase tracking-wide">
-        Email
-      </label>
-      <input
-        type="email"
-        value={form.email}
-        onChange={set("email")}
-        placeholder="you@example.com"
-        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 placeholder:text-slate-600 outline-none focus:border-amber-400/60 focus:bg-white/8 transition mb-4"
-      />
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div>
+            <label className="block text-sm text-slate-600 mb-2">Email</label>
+            <input
+              type="email"
+              value={form.email}
+              onChange={set("email")}
+              placeholder="you@example.com"
+              className="w-full h-12 px-4 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-400"
+            />
+          </div>
 
-      <div className="flex justify-between items-center mb-1.5">
-        <label className="text-xs text-slate-400 uppercase tracking-wide">
-          Password
-        </label>
-        <Link
-          to="/forgot-password"
-          className="text-xs text-amber-400 hover:text-amber-300 transition"
-        >
-          Forgot password?
-        </Link>
+          <div>
+            <div className="flex justify-between mb-2">
+              <label className="text-sm text-slate-600">Password</label>
+              <button
+                type="button"
+                onClick={() => navigate("/forgot-password")}
+                className="cursor-pointer text-sm text-amber-500 hover:text-amber-600"
+              >
+                Forgot?
+              </button>
+            </div>
+            <input
+              type="password"
+              value={form.password}
+              onChange={set("password")}
+              placeholder="••••••••"
+              className="w-full h-12 px-4 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-400"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full h-12 rounded-xl bg-slate-900 text-white font-medium hover:bg-slate-800 transition cursor-pointer"
+          >
+            {loading ? "Signing in..." : "Sign in"}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate("/oauth-callback")}
+            className="w-full h-12 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 transition flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <GoogleIcon /> Continue with Google
+          </button>
+        </form>
+
+        <p className="text-center text-sm text-slate-500 mt-8">
+          No account?{" "}
+          <span
+            onClick={() => navigate("/signup")}
+            className="text-slate-900 font-medium cursor-pointer"
+          >
+            Create one
+          </span>
+        </p>
       </div>
-      <input
-        type="password"
-        value={form.password}
-        onChange={set("password")}
-        placeholder="••••••••"
-        onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 placeholder:text-slate-600 outline-none focus:border-amber-400/60 transition mb-6"
-      />
-
-      <button
-        onClick={handleSubmit}
-        disabled={loading}
-        className="w-full bg-amber-400 hover:bg-amber-300 text-black font-semibold py-3 rounded-xl text-sm transition disabled:opacity-50"
-      >
-        {loading ? "Signing in..." : "Sign in"}
-      </button>
-
-      <button
-        onClick={() =>
-          (window.location.href = `${import.meta.env.VITE_API_URL}/auth/google`)
-        }
-        className="w-full mt-3 flex items-center justify-center gap-2.5 border border-white/10 hover:border-white/20 text-slate-300 py-3 rounded-xl text-sm transition"
-      >
-        <GoogleIcon />
-        Continue with Google
-      </button>
-
-      <p className="text-center text-slate-500 text-xs mt-6">
-        No account?{" "}
-        <Link
-          to="/signup"
-          className="text-amber-400 hover:text-amber-300 transition"
-        >
-          Create one →
-        </Link>
-      </p>
-    </AuthLayout>
+    </div>
   );
 }
 
